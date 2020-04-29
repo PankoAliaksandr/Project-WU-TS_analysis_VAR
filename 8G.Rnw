@@ -1,0 +1,170 @@
+\documentclass[12pt]{article}
+\usepackage{tikz,pgfplots}
+\usepackage{calculator}
+\usepackage{colortbl}
+\usepackage{epsfig, epstopdf}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{bbm}
+\usepackage{alltt}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{fancyvrb}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linktoc=all, linkcolor=blue}
+
+\begin{document}
+
+\section*{Exercise 8G}
+
+\subsection*{Task Description}
+
+  \begin{enumerate}
+    \item Set up a VAR (with data of your own choice).
+    \item Choose the order of the VAR ( VAR(xy, ic ="AIC", ...) )
+    \item Test the residuals wrt white noise.
+    \item Comment on the roots of the characteristic polynomial.
+    \item Generate forecasts for at least 4 periods into the future.
+    \item Inspect the MA(infinity) representations of the model.
+    \item Comment on the impulse response function.
+    \item Comment on the forecast error decomposition.
+  \end{enumerate}
+
+
+\subsection*{Data}
+
+  \begin{itemize}
+    \item Data description: Canadian labor market data
+    \item Data scource: OECD
+    \item Period: 1stQ 1980 until 4thQ 2000
+    \item The variable \textbf{e} stands for employment 
+    \item The variable \textbf{prod} assigns labour productivity
+    \item The variable \textbf{rw}  stands for the real wage
+    \item The variable \textbf{U} is the unemployment rate
+  \end{itemize}
+  
+
+<< fig = TRUE, echo=FALSE, warning=FALSE, include=FALSE>>=
+
+library("vars")
+## read data  OR  use data of your own choice
+data(Canada)           #   help(Canada)
+@
+
+\subsection*{Data Plot}
+
+<< fig = TRUE, echo=FALSE, warning=FALSE>>=
+plot(Canada)
+@
+
+In the plot we can see the similar trend in variables e, prod and rw, which can possibly indicate, that there is a certain ammount of connection between the variables. We will consider this situation more closely later.
+
+\subsection*{VAR model selection}
+
+At first, we would like to fit this data with the VAR model. For it, we need to determine the optimal lag-order.To find it we use the function \textbf{VARselect}, which gives us several information criteria.
+
+<<echo=TRUE>>=
+VARselect(Canada, lag.max=6)
+@
+
+To choose the optimal lag, we take the one with the smallest information criteria. As you can see, AIC shows that the third lag is the optimal one.
+However, we choose a lag 2, according to Schwarz Critertion and Hannan-Quinn Criterion, since they are the most conservative criteria. 
+
+\subsection*{Model VAR(2)}
+
+So now we can calculate VAR(2) model.
+
+<<echo=TRUE>>=
+mod <- VAR(Canada, p = 2, type = "const")
+summary(mod)
+@
+
+Summary gives us an overview on which variables and their lags are significant in each equation. Moreover, covariance and correlation matrices of the resduals for four equations are given.
+
+
+\subsection*{Model stability}
+To check the stability of VAR model we need to analize the roots of the characteristic equationuse. They must be outside the unit circle. The function \textbf{roots()} computes the eigenvalues of the companion matrix and returns by default their moduli. As was proved in our excercises, the equivalent statement to the original check is that the eigenvalues should be inside the unit circle.
+
+<<echo=TRUE>>=
+roots(mod)
+@
+
+As we can see, the model is stable with a constant as deterministic regressor.
+
+\subsection*{White noise test}
+Now we want to test the residuals wrt white noise.The Ljung‐Box Tes is used for this. The Null Hypothesis is White noise.
+
+<<echo=TRUE>>=
+source("mq_R.txt")
+mq(resid(mod),10)
+@
+
+Based on the output we don't reject the H0 (residuals are white noise) at 95\% significance level.
+
+
+\subsection*{Forecasting}
+
+To do a forecast we use the \textbf{predict()} function for the lag 6.
+
+<<fig=TRUE>>=
+plot(predict(mod, n.ahead= 6,interval='confidence'))
+@
+
+As you can see from the graphs, the prediction seems to be correct, since it goes in the same direction as a trend. Furthermore, if we look at the confidence intervals for each forecast, we can notice, that for variables prod and U the intervals are larger, which perfectly correlates with their higher volatility in the historical period.
+
+\subsection*{MA(infinity) representation}
+
+As we have understood, that our system is stabile, we can look now at the MA(infinity) representation of the resulting VAR model.
+
+<<echo = FALSE>>=
+Phi(mod, nstep=3) # matrices of the MA(infty) representation (of correlated errors)
+@
+
+In the output we have 4 matrices for lags 0,1,2 and 3. In MA representation columns represent the variables, that cause the shock, and rows are those varibles, that are influenced by it.
+
+\quad
+
+In the second matrix we already can see the changes in the variables at lag 1. Here, for example, we can see, that the increase in employment already causes an effect, the negative one, on all other variables. In the third matrix the effect strengthens, as the change in employment itself is higher, and the same situation happens at the lag 4, represented by the last matrix.
+
+\subsection*{Impulse response function}
+
+Impulse response functions represent the mechanisms through which shock spread
+over time. It is useful to look at the impulse response effect explicitly on the graph. Below, you can see the plots of the functions themselves and the corresponding non-cumulated shocks of the variables in response to changes in other variables in different lags. Moreover, there are also calculated lower and higher 95\% confidence boundaries of those shocks, obtained by the Bootstrap method.
+
+<<echo = FALSE, fig = TRUE>>=
+## irf gives the the effect of 
+# innovations of x with lag=0,1,2,...  to x_t,  to y_t, ...
+# innovations of y with lag=0,1,2,...  to x_t,  to y_t, ...
+irf(mod, n.ahead=8)          # impulse response fct orthogonalized (default) impulses
+plot( irf(mod, n.ahead=6) )  # for move on enter
+@
+
+The increase in employment at the time period 0 can cause the further slight increase in it for several periods, but the level can stay almost the same. From confidence intervals we can also see, that till the 6th lag the effect can completely disappear, which makes perfect economic sense.
+
+\quad
+
+Furthermore, if we look at the graph of changes in unemployment, we can see, that it is mirroring the employment, which is quite logical, as, for instance, the increasing employment in 2nd lag is accompanied by the enlarging decrease in unemployment.
+
+\quad
+
+Concerning the measure of productivity, we can also see, that at first the change in employment hardly influences it, but with time the productivity decreases, as the market is overflowing with the labour and it may cause worsening of work quality. Moreover, we can notice, that according to the confidence intervals, the actual effect of employment on productivity can be overall positive or negative, but the trend will be the same.
+
+\quad
+
+In regards to the real wage it is seen, that the increase in employment can at first lessen the level of real wage, but in time it go higher, as the wages are adjusted to the overall changes in economy.
+
+\subsection*{Forecast error decomposition}
+
+Forecast error decomposition is based on the orthogonalized MA representation of VAR, and shows the contribution of one variable to the lagged forecast error variance in some other variable. Below we can see the contributions of the change in different variables to the one with respect to the time period and their graphical representation.
+
+<< fig = TRUE, echo = FALSE >>=
+fevd(mod, n.ahead=8)   # forecast error decomposition wrt orthogonalized residuals
+plot( fevd(mod, n.ahead=6) ) 
+@
+
+On the first chart we can see, that apart from employment itself, in time some uncertainty is brought by the labour productivity. On the other hand, for productivity itself almost no other variables cause the uncertainty. The same situation is observed in real wage. However, for unemployment employment plays a huge role, and in time the effect of unemployment itself is becoming less and less, while productivity starts showing some influence on unemployment forecast uncertainty.
+\end{document}
